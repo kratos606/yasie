@@ -154,6 +154,39 @@ return new class extends Migration
 
 </file>
 
+<file path="database/migrations/2025_09_02_012225_create_glb_models_table.php">
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('glb_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('original_name');
+            $table->string('storage_path')->unique();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('glb_models');
+    }
+};
+
+</file>
+
 <file path="database/factories/UserFactory.php">
 <?php
 
@@ -290,7 +323,13 @@ return [
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
             'report' => false,
-        ],
+	],
+
+	'secure_models' => [
+            'driver' => 'local',
+            'root' => storage_path('app/secure_models'),
+            'throw' => false,
+    	],
 
     ],
 
@@ -822,6 +861,8 @@ return [
 
     'cipher' => 'AES-256-CBC',
 
+    'model_encryption_key' => env('MODEL_ENCRYPTION_KEY', 'my-super-secret-key-123'),
+    
     'key' => env('APP_KEY'),
 
     'previous_keys' => [
@@ -1486,6 +1527,27 @@ return [
     'partitioned' => env('SESSION_PARTITIONED_COOKIE', false),
 
 ];
+
+</file>
+
+<file path="routes/api.php">
+<?php
+
+// routes/api.php
+
+use App\Http\Controllers\Api\GlbModelController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/user', function (Request $request) {
+    return $request->user();
+})->middleware('auth:sanctum');
+
+Route::get('/models/{model:id}', [GlbModelController::class, 'show'])
+    ->name('models.show');
+
+Route::post('/models/upload', [GlbModelController::class, 'upload'])
+    ->name('models.upload');
 
 </file>
 
@@ -2355,6 +2417,14 @@ VITE_APP_NAME="${APP_NAME}"
 <?php /**PATH /var/www/secure-glb-viewer/vendor/laravel/framework/src/Illuminate/Foundation/Providers/../resources/exceptions/renderer/components/layout.blade.php ENDPATH**/ ?>
 </file>
 
+<file path="storage/framework/views/950bc93a5942bb6b450de4d04b3c654d.php">
+<?php $__env->startSection('title', __('Not Found')); ?>
+<?php $__env->startSection('code', '404'); ?>
+<?php $__env->startSection('message', __('Not Found')); ?>
+
+<?php echo $__env->make('errors::minimal', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH /var/www/secure-glb-viewer/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/views/404.blade.php ENDPATH**/ ?>
+</file>
+
 <file path="storage/framework/views/18c4366972c436961eb297fc12f75b4a.php">
 <script>
     let exceptionAsMarkdown = <?php echo e(Illuminate\Support\Js::from($markdown)); ?>
@@ -2818,6 +2888,44 @@ VITE_APP_NAME="${APP_NAME}"
 <?php /**PATH /var/www/secure-glb-viewer/vendor/laravel/framework/src/Illuminate/Foundation/Providers/../resources/exceptions/renderer/components/context.blade.php ENDPATH**/ ?>
 </file>
 
+<file path="storage/framework/views/a40755217270fbb8323c9c48a71c8f9f.php">
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title><?php echo $__env->yieldContent('title'); ?></title>
+
+        <style>
+            /*! normalize.css v8.0.1 | MIT License | github.com/necolas/normalize.css */html{line-height:1.15;-webkit-text-size-adjust:100%}body{margin:0}a{background-color:transparent}code{font-family:monospace,monospace;font-size:1em}[hidden]{display:none}html{font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;line-height:1.5}*,:after,:before{box-sizing:border-box;border:0 solid #e2e8f0}a{color:inherit;text-decoration:inherit}code{font-family:Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace}svg,video{display:block;vertical-align:middle}video{max-width:100%;height:auto}.bg-white{--bg-opacity:1;background-color:#fff;background-color:rgba(255,255,255,var(--bg-opacity))}.bg-gray-100{--bg-opacity:1;background-color:#f7fafc;background-color:rgba(247,250,252,var(--bg-opacity))}.border-gray-200{--border-opacity:1;border-color:#edf2f7;border-color:rgba(237,242,247,var(--border-opacity))}.border-gray-400{--border-opacity:1;border-color:#cbd5e0;border-color:rgba(203,213,224,var(--border-opacity))}.border-t{border-top-width:1px}.border-r{border-right-width:1px}.flex{display:flex}.grid{display:grid}.hidden{display:none}.items-center{align-items:center}.justify-center{justify-content:center}.font-semibold{font-weight:600}.h-5{height:1.25rem}.h-8{height:2rem}.h-16{height:4rem}.text-sm{font-size:.875rem}.text-lg{font-size:1.125rem}.leading-7{line-height:1.75rem}.mx-auto{margin-left:auto;margin-right:auto}.ml-1{margin-left:.25rem}.mt-2{margin-top:.5rem}.mr-2{margin-right:.5rem}.ml-2{margin-left:.5rem}.mt-4{margin-top:1rem}.ml-4{margin-left:1rem}.mt-8{margin-top:2rem}.ml-12{margin-left:3rem}.-mt-px{margin-top:-1px}.max-w-xl{max-width:36rem}.max-w-6xl{max-width:72rem}.min-h-screen{min-height:100vh}.overflow-hidden{overflow:hidden}.p-6{padding:1.5rem}.py-4{padding-top:1rem;padding-bottom:1rem}.px-4{padding-left:1rem;padding-right:1rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.pt-8{padding-top:2rem}.fixed{position:fixed}.relative{position:relative}.top-0{top:0}.right-0{right:0}.shadow{box-shadow:0 1px 3px 0 rgba(0,0,0,.1),0 1px 2px 0 rgba(0,0,0,.06)}.text-center{text-align:center}.text-gray-200{--text-opacity:1;color:#edf2f7;color:rgba(237,242,247,var(--text-opacity))}.text-gray-300{--text-opacity:1;color:#e2e8f0;color:rgba(226,232,240,var(--text-opacity))}.text-gray-400{--text-opacity:1;color:#cbd5e0;color:rgba(203,213,224,var(--text-opacity))}.text-gray-500{--text-opacity:1;color:#a0aec0;color:rgba(160,174,192,var(--text-opacity))}.text-gray-600{--text-opacity:1;color:#718096;color:rgba(113,128,150,var(--text-opacity))}.text-gray-700{--text-opacity:1;color:#4a5568;color:rgba(74,85,104,var(--text-opacity))}.text-gray-900{--text-opacity:1;color:#1a202c;color:rgba(26,32,44,var(--text-opacity))}.uppercase{text-transform:uppercase}.underline{text-decoration:underline}.antialiased{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.tracking-wider{letter-spacing:.05em}.w-5{width:1.25rem}.w-8{width:2rem}.w-auto{width:auto}.grid-cols-1{grid-template-columns:repeat(1,minmax(0,1fr))}@-webkit-keyframes spin{0%{transform:rotate(0deg)}to{transform:rotate(1turn)}}@keyframes spin{0%{transform:rotate(0deg)}to{transform:rotate(1turn)}}@-webkit-keyframes ping{0%{transform:scale(1);opacity:1}75%,to{transform:scale(2);opacity:0}}@keyframes ping{0%{transform:scale(1);opacity:1}75%,to{transform:scale(2);opacity:0}}@-webkit-keyframes pulse{0%,to{opacity:1}50%{opacity:.5}}@keyframes pulse{0%,to{opacity:1}50%{opacity:.5}}@-webkit-keyframes bounce{0%,to{transform:translateY(-25%);-webkit-animation-timing-function:cubic-bezier(.8,0,1,1);animation-timing-function:cubic-bezier(.8,0,1,1)}50%{transform:translateY(0);-webkit-animation-timing-function:cubic-bezier(0,0,.2,1);animation-timing-function:cubic-bezier(0,0,.2,1)}}@keyframes bounce{0%,to{transform:translateY(-25%);-webkit-animation-timing-function:cubic-bezier(.8,0,1,1);animation-timing-function:cubic-bezier(.8,0,1,1)}50%{transform:translateY(0);-webkit-animation-timing-function:cubic-bezier(0,0,.2,1);animation-timing-function:cubic-bezier(0,0,.2,1)}}@media (min-width:640px){.sm\:rounded-lg{border-radius:.5rem}.sm\:block{display:block}.sm\:items-center{align-items:center}.sm\:justify-start{justify-content:flex-start}.sm\:justify-between{justify-content:space-between}.sm\:h-20{height:5rem}.sm\:ml-0{margin-left:0}.sm\:px-6{padding-left:1.5rem;padding-right:1.5rem}.sm\:pt-0{padding-top:0}.sm\:text-left{text-align:left}.sm\:text-right{text-align:right}}@media (min-width:768px){.md\:border-t-0{border-top-width:0}.md\:border-l{border-left-width:1px}.md\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (min-width:1024px){.lg\:px-8{padding-left:2rem;padding-right:2rem}}@media (prefers-color-scheme:dark){.dark\:bg-gray-800{--bg-opacity:1;background-color:#2d3748;background-color:rgba(45,55,72,var(--bg-opacity))}.dark\:bg-gray-900{--bg-opacity:1;background-color:#1a202c;background-color:rgba(26,32,44,var(--bg-opacity))}.dark\:border-gray-700{--border-opacity:1;border-color:#4a5568;border-color:rgba(74,85,104,var(--border-opacity))}.dark\:text-white{--text-opacity:1;color:#fff;color:rgba(255,255,255,var(--text-opacity))}.dark\:text-gray-400{--text-opacity:1;color:#cbd5e0;color:rgba(203,213,224,var(--text-opacity))}}
+        </style>
+
+        <style>
+            body {
+                font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            }
+        </style>
+    </head>
+    <body class="antialiased">
+        <div class="relative flex items-top justify-center min-h-screen bg-gray-100 dark:bg-gray-900 sm:items-center sm:pt-0">
+            <div class="max-w-xl mx-auto sm:px-6 lg:px-8">
+                <div class="flex items-center pt-8 sm:justify-start sm:pt-0">
+                    <div class="px-4 text-lg text-gray-500 border-r border-gray-400 tracking-wider">
+                        <?php echo $__env->yieldContent('code'); ?>
+                    </div>
+
+                    <div class="ml-4 text-lg text-gray-500 uppercase tracking-wider">
+                        <?php echo $__env->yieldContent('message'); ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
+<?php /**PATH /var/www/secure-glb-viewer/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/views/minimal.blade.php ENDPATH**/ ?>
+</file>
+
 <file path="storage/framework/views/fc8bbbd30c7ef4a887ff7c5e4a1a0fd9.php">
 # <?php echo e($exception->class()); ?> - <?php echo $exception->title(); ?>
 
@@ -3105,6 +3213,81 @@ No database queries detected.
 
 </file>
 
+<file path="app/Http/Controllers/Api/GlbModelController.php">
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\GlbModel;
+use App\Services\ModelEncryptionService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+
+class GlbModelController extends Controller
+{
+    protected ModelEncryptionService $encryptionService;
+
+    public function __construct(ModelEncryptionService $encryptionService)
+    {
+        $this->encryptionService = $encryptionService;
+    }
+
+    /**
+     * Handle the upload and encryption of a new GLB model.
+     */
+    public function upload(Request $request)
+    {
+        $request->validate([
+            'modelFile' => ['required', 'file', 'mimes:glb'],
+        ]);
+
+        $file = $request->file('modelFile');
+        $originalContents = $file->get();
+        $originalName = $file->getClientOriginalName();
+
+        // 1. Encrypt the file contents
+        $encryptedContents = $this->encryptionService->process($originalContents);
+
+        // 2. Store the encrypted file on our secure disk
+        $filename = Str::uuid() . '.encrypted';
+        $storagePath = 'models/' . $filename;
+        Storage::disk('secure_models')->put($storagePath, $encryptedContents);
+
+        // 3. Create a database record for the model
+        $model = GlbModel::create([
+            'original_name' => $originalName,
+            'storage_path' => $storagePath,
+        ]);
+
+        return response()->json([
+            'message' => 'Model uploaded and secured successfully.',
+            'model_id' => $model->id,
+        ], 201);
+    }
+
+    /**
+     * Serve the encrypted model file to an authorized user.
+     */
+    public function show(GlbModel $model)
+    {
+        // Authorization logic should be handled by middleware before this method is called.
+        // Example: Is the authenticated user allowed to view this $model->id?
+
+        if (!Storage::disk('secure_models')->exists($model->storage_path)) {
+            return response()->json(['error' => 'Model file not found on server.'], 404);
+        }
+
+        // Use Storage::response to correctly stream the file with appropriate headers
+        return Storage::disk('secure_models')->response($model->storage_path, null, [
+            'Content-Type' => 'application/octet-stream',
+        ]);
+    }
+}
+
+</file>
+
 <file path="app/Http/Controllers/Controller.php">
 <?php
 
@@ -3141,6 +3324,41 @@ class AppServiceProvider extends ServiceProvider
     {
         //
     }
+}
+
+</file>
+
+<file path="app/Models/GlbModel.php">
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class GlbModel extends Model
+{
+    use HasFactory, HasUuids;
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    protected $fillable = [
+        'original_name',
+        'storage_path',
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'storage_path', // Don't expose the internal file path
+    ];
 }
 
 </file>
@@ -3197,6 +3415,49 @@ class User extends Authenticatable
 
 </file>
 
+<file path="app/Services/ModelEncryptionService.php">
+<?php
+
+namespace App\Services;
+
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
+use Illuminate\Support\Facades\Config;
+
+class ModelEncryptionService
+{
+    private string $key;
+
+    public function __construct()
+    {
+        $this->key = Config::get('app.model_encryption_key');
+
+        if (empty($this->key)) {
+            throw new \RuntimeException('Model encryption key is not set.');
+        }
+    }
+
+    /**
+     * Encrypts (or decrypts) a binary string using a simple XOR cipher.
+     *
+     * @param string $data The binary content of the file.
+     * @return string The processed binary content.
+     */
+    public function process(string $data): string
+    {
+        $keyLength = strlen($this->key);
+        $dataLength = strlen($data);
+        $result = '';
+
+        for ($i = 0; $i < $dataLength; $i++) {
+            $result .= $data[$i] ^ $this->key[$i % $keyLength];
+        }
+
+        return $result;
+    }
+}
+
+</file>
+
 <file path="bootstrap/app.php">
 <?php
 
@@ -3207,11 +3468,14 @@ use Illuminate\Foundation\Configuration\Middleware;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
-        commands: __DIR__.'/../routes/console.php',
+	api: __DIR__.'/../routes/api.php',
+	commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->validateCsrfTokens(except: [
+           'api/*',
+	]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
@@ -3689,6 +3953,8 @@ AWS_BUCKET=
 AWS_USE_PATH_STYLE_ENDPOINT=false
 
 VITE_APP_NAME="${APP_NAME}"
+
+MODEL_ENCRYPTION_KEY="my-super-secret-key-123"
 
 </file>
 
