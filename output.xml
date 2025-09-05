@@ -1538,6 +1538,7 @@ return [
 use App\Http\Controllers\Api\GlbModelController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\ModelConversionController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -1547,7 +1548,19 @@ Route::get('/models/{model:id}', [GlbModelController::class, 'show'])
     ->name('models.show');
 
 Route::post('/models/upload', [GlbModelController::class, 'upload'])
-    ->name('models.upload');
+	->name('models.upload');
+
+// Model conversion routes
+Route::prefix('convert')->group(function () {
+    Route::get('/formats', [ModelConversionController::class, 'getSupportedFormats'])
+        ->name('convert.formats');
+
+    Route::post('/model', [ModelConversionController::class, 'convert'])
+        ->name('convert.model');
+
+    Route::post('/info', [ModelConversionController::class, 'getFileInfo'])
+        ->name('convert.info');
+});
 
 </file>
 
@@ -1738,6 +1751,7 @@ VITE_APP_NAME="${APP_NAME}"
 }
 
 </file>
+<error>Failed reading directory /var/www/secure-glb-viewer/storage/app/private/temp: [Errno 13] Permission denied: '/var/www/secure-glb-viewer/storage/app/private/temp'</error>
 
 <file path="storage/framework/views/c22650e84a060485b6cad2ebad6d3a5d.php">
 <?php if (isset($component)) { $__componentOriginal74daf2d0a9c625ad90327a6043d15980 = $component; } ?>
@@ -3288,6 +3302,217 @@ class GlbModelController extends Controller
 
 </file>
 
+<file path="app/Http/Controllers/Api/ModelConversionController.php">
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Services\ModelConversionService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+
+class ModelConversionController extends Controller
+{
+    protected ModelConversionService $conversionService;
+
+    public function __construct(ModelConversionService $conversionService)
+    {
+        $this->conversionService = $conversionService;
+    }
+
+    /**
+     * Get supported formats
+     */
+    public function getSupportedFormats()
+    {
+        return response()->json([
+            'input_formats' => $this->conversionService->getSupportedInputFormats(),
+            'output_formats' => $this->conversionService->getSupportedOutputFormats(),
+        ]);
+    }
+
+    /**
+     * Convert a 3D model file to another format
+     */
+    public function convert(Request $request)
+    {
+        // Validate request
+        $request->validate([
+            'file' => [
+                'required',
+                'file',
+                'max:102400', // 100MB max
+            ],
+            'output_format' => [
+                'required',
+                'string',
+            ],
+        ]);
+
+        $file = $request->file('file');
+        $outputFormat = strtolower($request->input('output_format'));
+        $inputFormat = strtolower($file->getClientOriginalExtension());
+
+        // Validate input format
+        if (!$this->conversionService->isInputFormatSupported($inputFormat)) {
+            return response()->json([
+                'error' => 'Unsupported input format',
+                'message' => "The input format '{$inputFormat}' is not supported.",
+                'supported_formats' => $this->conversionService->getSupportedInputFormats(),
+            ], 422);
+        }
+
+        // Validate output format
+        if (!$this->conversionService->isOutputFormatSupported($outputFormat)) {
+            return response()->json([
+                'error' => 'Unsupported output format',
+                'message' => "The output format '{$outputFormat}' is not supported.",
+                'supported_formats' => $this->conversionService->getSupportedOutputFormats(),
+            ], 422);
+        }
+
+        // Check if input and output formats are the same
+        if ($inputFormat === $outputFormat) {
+            return response()->json([
+                'error' => 'Same format',
+                'message' => 'Input and output formats cannot be the same.',
+            ], 422);
+        }
+
+        try {
+            // Store the uploaded file temporarily
+            $tempPath = 'temp/conversions/' . Str::uuid();
+            $inputPath = $file->storeAs($tempPath, 'input.' . $inputFormat, 'local');
+            $fullInputPath = Storage::disk('local')->path($inputPath);
+
+            // Get file info before conversion (optional)
+            $fileInfo = $this->conversionService->getFileInfo($fullInputPath);
+
+            // Perform conversion
+            $outputPath = $this->conversionService->convert($fullInputPath, $outputFormat);
+
+            // Generate download filename
+            $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            $downloadName = $originalName . '.' . $outputFormat;
+
+            // Read the converted file
+            $convertedContent = file_get_contents($outputPath);
+
+            // Clean up temporary files
+            Storage::disk('local')->deleteDirectory($tempPath);
+            if (file_exists($outputPath)) {
+                unlink($outputPath);
+            }
+
+            // Return the converted file as download
+            return response($convertedContent)
+                ->header('Content-Type', $this->getMimeType($outputFormat))
+                ->header('Content-Disposition', 'attachment; filename="' . $downloadName . '"')
+                ->header('X-Original-Format', $inputFormat)
+                ->header('X-Converted-Format', $outputFormat)
+                ->header('X-File-Info', json_encode($fileInfo));
+
+        } catch (\Exception $e) {
+            // Clean up on error
+            if (isset($tempPath)) {
+                Storage::disk('local')->deleteDirectory($tempPath);
+            }
+            if (isset($outputPath) && file_exists($outputPath)) {
+                unlink($outputPath);
+            }
+
+            return response()->json([
+                'error' => 'Conversion failed',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get information about an uploaded 3D model file
+     */
+    public function getFileInfo(Request $request)
+    {
+        $request->validate([
+            'file' => [
+                'required',
+                'file',
+                'max:102400', // 100MB max
+            ],
+        ]);
+
+        $file = $request->file('file');
+        $inputFormat = strtolower($file->getClientOriginalExtension());
+
+        // Validate input format
+        if (!$this->conversionService->isInputFormatSupported($inputFormat)) {
+            return response()->json([
+                'error' => 'Unsupported format',
+                'message' => "The format '{$inputFormat}' is not supported.",
+                'supported_formats' => $this->conversionService->getSupportedInputFormats(),
+            ], 422);
+        }
+
+        try {
+            // Store the uploaded file temporarily
+            $tempPath = 'temp/info/' . Str::uuid();
+            $inputPath = $file->storeAs($tempPath, 'input.' . $inputFormat, 'local');
+            $fullInputPath = Storage::disk('local')->path($inputPath);
+
+            // Get file info
+            $info = $this->conversionService->getFileInfo($fullInputPath);
+            $info['original_name'] = $file->getClientOriginalName();
+            $info['mime_type'] = $file->getClientMimeType();
+
+            // Clean up
+            Storage::disk('local')->deleteDirectory($tempPath);
+
+            return response()->json([
+                'success' => true,
+                'info' => $info,
+            ]);
+
+        } catch (\Exception $e) {
+            // Clean up on error
+            if (isset($tempPath)) {
+                Storage::disk('local')->deleteDirectory($tempPath);
+            }
+
+            return response()->json([
+                'error' => 'Failed to get file info',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get MIME type for a given format
+     */
+    private function getMimeType(string $format): string
+    {
+        $mimeTypes = [
+            'glb' => 'model/gltf-binary',
+            'gltf' => 'model/gltf+json',
+            'obj' => 'model/obj',
+            'stl' => 'model/stl',
+            'ply' => 'model/ply',
+            'dae' => 'model/vnd.collada+xml',
+            'fbx' => 'application/octet-stream',
+            '3ds' => 'application/x-3ds',
+            'x3d' => 'model/x3d+xml',
+            'json' => 'application/json',
+            'xml' => 'application/xml',
+        ];
+
+        return $mimeTypes[strtolower($format)] ?? 'application/octet-stream';
+    }
+}
+
+
+</file>
+
 <file path="app/Http/Controllers/Controller.php">
 <?php
 
@@ -3455,6 +3680,220 @@ class ModelEncryptionService
         return $result;
     }
 }
+
+</file>
+
+<file path="app/Services/ModelConversionService.php">
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Process;
+use Symfony\Component\Process\Exception\ProcessFailedException;
+
+class ModelConversionService
+{
+    /**
+     * Supported input formats
+     */
+    private array $supportedInputFormats = [
+        'glb', 'gltf', 'obj', 'fbx', 'dae', 'stl', 'ply', '3ds', 
+        'blend', 'x3d', 'ase', 'ifc', 'xgl', 'zgl', 'dxf', 'lwo',
+        'lws', 'lxo', 'x', 'ac', 'ms3d', 'cob', 'scn', 'mesh',
+        'xml', 'irrmesh', 'irr', 'mdl', 'md2', 'md3', 'pk3', 'mdc',
+        'md5', 'smd', 'vta', 'ogex', '3d', 'b3d', 'q3d', 'q3s',
+        'nff', 'off', 'raw', 'ter', 'hmp', 'ndo'
+    ];
+
+    /**
+     * Supported output formats
+     */
+    private array $supportedOutputFormats = [
+        'glb', 'gltf', 'obj', 'stl', 'ply', 'dae', 'x3d', 'fbx',
+        '3ds', 'json', 'assbin', 'assxml', 'x', 'step', 'stp'
+    ];
+
+    /**
+     * Check if input format is supported
+     */
+    public function isInputFormatSupported(string $format): bool
+    {
+        return in_array(strtolower($format), $this->supportedInputFormats);
+    }
+
+    /**
+     * Check if output format is supported
+     */
+    public function isOutputFormatSupported(string $format): bool
+    {
+        return in_array(strtolower($format), $this->supportedOutputFormats);
+    }
+
+    /**
+     * Get list of supported input formats
+     */
+    public function getSupportedInputFormats(): array
+    {
+        return $this->supportedInputFormats;
+    }
+
+    /**
+     * Get list of supported output formats
+     */
+    public function getSupportedOutputFormats(): array
+    {
+        return $this->supportedOutputFormats;
+    }
+
+    /**
+     * Convert a 3D model file to another format
+     * 
+     * @param string $inputPath Path to input file
+     * @param string $outputFormat Desired output format
+     * @return string Path to converted file
+     * @throws \Exception
+     */
+    public function convert(string $inputPath, string $outputFormat): string
+    {
+        // Validate input file exists
+        if (!file_exists($inputPath)) {
+            throw new \Exception('Input file does not exist');
+        }
+
+        // Get input format from file extension
+        $inputFormat = pathinfo($inputPath, PATHINFO_EXTENSION);
+
+        // Validate formats
+        if (!$this->isInputFormatSupported($inputFormat)) {
+            throw new \Exception("Input format '{$inputFormat}' is not supported. Supported formats: " . implode(', ', $this->supportedInputFormats));
+        }
+
+        if (!$this->isOutputFormatSupported($outputFormat)) {
+            throw new \Exception("Output format '{$outputFormat}' is not supported. Supported formats: " . implode(', ', $this->supportedOutputFormats));
+        }
+
+        // Generate output path
+        $outputPath = $this->generateOutputPath($inputPath, $outputFormat);
+
+        // Build assimp command
+        $command = $this->buildAssimpCommand($inputPath, $outputPath, $outputFormat);
+
+        // Execute conversion
+        $process = Process::fromShellCommandline($command);
+        $process->setTimeout(300); // 5 minutes timeout for large files
+        
+        try {
+            $process->mustRun();
+            
+            if (!file_exists($outputPath)) {
+                throw new \Exception('Conversion completed but output file was not created');
+            }
+
+            return $outputPath;
+        } catch (ProcessFailedException $exception) {
+            throw new \Exception('Conversion failed: ' . $exception->getMessage());
+        }
+    }
+
+    /**
+     * Generate output file path
+     */
+    private function generateOutputPath(string $inputPath, string $outputFormat): string
+    {
+        $directory = pathinfo($inputPath, PATHINFO_DIRNAME);
+        $filename = pathinfo($inputPath, PATHINFO_FILENAME);
+        
+        return $directory . '/' . $filename . '_converted.' . strtolower($outputFormat);
+    }
+
+    /**
+     * Build the assimp command based on output format
+     */
+    private function buildAssimpCommand(string $inputPath, string $outputPath, string $outputFormat): string
+    {
+        $format = strtolower($outputFormat);
+        
+        // Map format to assimp export format codes
+        $formatMap = [
+            'glb' => 'glb2',
+            'gltf' => 'gltf2',
+            'obj' => 'obj',
+            'stl' => 'stl',
+            'ply' => 'ply',
+            'dae' => 'collada',
+            'fbx' => 'fbx',
+            '3ds' => '3ds',
+            'x3d' => 'x3d',
+            'json' => 'assjson',
+            'assbin' => 'assbin',
+            'assxml' => 'assxml',
+            'step' => 'step',
+            'stp' => 'step',
+            'x' => 'x'
+        ];
+
+        $exportFormat = $formatMap[$format] ?? $format;
+
+        // Build command with proper escaping
+        return sprintf(
+            'assimp export %s %s -f%s',
+            escapeshellarg($inputPath),
+            escapeshellarg($outputPath),
+            $exportFormat
+        );
+    }
+
+    /**
+     * Get information about a 3D model file
+     */
+    public function getFileInfo(string $filePath): array
+    {
+        if (!file_exists($filePath)) {
+            throw new \Exception('File does not exist');
+        }
+
+        $command = sprintf('assimp info %s', escapeshellarg($filePath));
+        $process = Process::fromShellCommandline($command);
+        
+        try {
+            $process->mustRun();
+            $output = $process->getOutput();
+            
+            // Parse the output to extract useful information
+            $info = [];
+            
+            // Extract basic info from assimp output
+            if (preg_match('/Meshes:\s+(\d+)/', $output, $matches)) {
+                $info['meshes'] = (int)$matches[1];
+            }
+            if (preg_match('/Faces:\s+(\d+)/', $output, $matches)) {
+                $info['faces'] = (int)$matches[1];
+            }
+            if (preg_match('/Vertices:\s+(\d+)/', $output, $matches)) {
+                $info['vertices'] = (int)$matches[1];
+            }
+            if (preg_match('/Materials:\s+(\d+)/', $output, $matches)) {
+                $info['materials'] = (int)$matches[1];
+            }
+            if (preg_match('/Textures:\s+(\d+)/', $output, $matches)) {
+                $info['textures'] = (int)$matches[1];
+            }
+            if (preg_match('/Animations:\s+(\d+)/', $output, $matches)) {
+                $info['animations'] = (int)$matches[1];
+            }
+            
+            $info['format'] = pathinfo($filePath, PATHINFO_EXTENSION);
+            $info['size'] = filesize($filePath);
+            $info['raw_output'] = $output;
+            
+            return $info;
+        } catch (ProcessFailedException $exception) {
+            throw new \Exception('Failed to get file info: ' . $exception->getMessage());
+        }
+    }
+}
+
 
 </file>
 
